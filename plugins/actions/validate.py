@@ -74,6 +74,7 @@ class ActionModule(ActionBase):
             if host_vars["osd_group_name"] in host_vars["group_names"]:
                 notario.validate(host_vars, osd_options, defined_keys=True)
                 notario_store['osd_objectstore'] = host_vars["osd_objectstore"]
+                notario_store['osd_auto_discovery'] = host_vars.get("osd_auto_discovery", False)
                 if host_vars["osd_scenario"] == "collocated":
                     notario.validate(host_vars, collocated_osd_scenario, defined_keys=True)
 
@@ -169,6 +170,11 @@ def validate_rados_options(value):
     assert any([radosgw_address_given, radosgw_address_block_given, radosgw_interface_given]), msg
 
 
+def validate_devices(value):
+    if not notario_store["osd_auto_discovery"]:
+        assert isinstance(value, basestring), "devices must be a list of strings, invalid value found: %s" % value
+
+
 install_options = (
     ("ceph_origin", ceph_origin_choices),
     ("containerized_deployment", types.boolean),
@@ -211,15 +217,16 @@ rados_options = (
 
 osd_options = (
     (optional("dmcrypt"), types.boolean),
+    (optional("osd_auto_discovery"), types.boolean),
     ("osd_scenario", validate_osd_scenarios),
 )
 
-collocated_osd_scenario = ("devices", iterables.AllItems(types.string))
+collocated_osd_scenario = ("devices", validate_devices)
 
 non_collocated_osd_scenario = (
     (optional("bluestore_wal_devices"), iterables.AllItems(types.string)),
     (optional("dedicated_devices"), iterables.AllItems(types.string)),
-    ("devices", iterables.AllItems(types.string)),
+    ("devices", validate_devices),
 )
 
 lvm_osd_scenario = ("lvm_volumes", iterables.AllItems((
